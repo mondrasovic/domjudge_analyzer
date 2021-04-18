@@ -73,6 +73,7 @@ def main(
     if get_submissions:
         assure_contest_is_set('--get-submissions', contest)
         print_table(dj_man.get_submissions(contest), csv_file_path)
+    
     if submissions_dir_path:
         assure_contest_is_set('--submissions-dir-path', contest)
         dj_man.download_submission_files(
