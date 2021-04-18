@@ -6,12 +6,12 @@
 import sys
 import click
 import tabulate
+import dataclasses
 import configparser
 
 from typing import Optional, Iterable, Any
 
 from domjudge import DOMJudgeManager
-from presenter import get_presenter
 
 
 ################################################################################
@@ -22,10 +22,13 @@ from presenter import get_presenter
 @click.option(
     "--get-contests", is_flag=True, help="Print a list of all contests.")
 @click.option(
-    "--get-teams", type=int,
+    "-c", "--contest", type=int,
+    help="Apply commands to the given contest specified by ID.")
+@click.option(
+    "--get-teams", is_flag=True,
     help="Print a list of all teams for the given contest specified by ID.")
 @click.option(
-    "--get-problems", type=int,
+    "--get-problems", is_flag=True,
     help="Print a list of all problems for the given contest specified by ID.")
 @click.option(
     "--submissions-dir-path", type=click.Path(),
@@ -35,8 +38,8 @@ from presenter import get_presenter
     help="Activate verbose mode.")
 def main(
         server: str, username: Optional[str], passwd: Optional[str],
-        get_contests: bool, get_teams: Optional[int],
-        get_problems: Optional[int], submissions_dir_path: click.Path,
+        get_contests: bool, contest: Optional[int], get_teams: bool,
+        get_problems: bool, submissions_dir_path: click.Path,
         verbose: bool) -> int:
     if any(param is None for param in (server, username, passwd)):
         cfg = configparser.ConfigParser()
@@ -50,31 +53,57 @@ def main(
     
     if get_contests:
         print_items(dj_man.get_contests())
+    
     if get_teams:
-        print_items(dj_man.get_teams(get_teams))
+        assure_contest_is_set('--get-teams', contest)
+        print_items(dj_man.get_teams(contest))
     if get_problems:
-        print_items(dj_man.get_problems(get_problems))
+        assure_contest_is_set('--get-problems', contest)
+        print_items(dj_man.get_problems(contest))
     
     if submissions_dir_path:
-        pass
+        assure_contest_is_set('--submissions-dir-path', contest)
+        dj_man.download_submission_files(
+            contest, str(submissions_dir_path), verbose)
     
     return 0
 
 
 ################################################################################
+def assure_contest_is_set(option_name: str, contest: Optional[int]) -> None:
+    if contest is None:
+        raise click.BadOptionUsage(
+            option_name=option_name,
+            message=f"the {option_name} option may only be used with a "
+                    f"specific contest provided by -c, --contest")
+
+
+################################################################################
+def _get_printable_fields(item) -> Iterable[dataclasses.Field]:
+    return (
+        field
+        for field in dataclasses.fields(item)
+        if field.metadata and ('header_name' in field.metadata))
+
+
+################################################################################
 def print_items(items: Iterable[Any]) -> None:
-    rows = []
-    presenter = None
+    rows, headers = [], []
     
-    for item in items:
-        presenter = presenter or get_presenter(item.__class__)
-        rows.append(presenter.get_row_data(item))
+    for i, item in enumerate(items):
+        row_data = []
+        for field in _get_printable_fields(item):
+            if field.metadata:
+                if i == 0:
+                    headers.append(field.metadata['header_name'].upper())
+                val = getattr(item, field.name)
+                row_data.append(val)
+        rows.append(row_data)
     
-    if presenter:
-        headers = tuple(map(str.upper, presenter.get_headers()))
+    if headers:
         print(tabulate.tabulate(rows, headers=headers))
     else:
-        print("No results retrieves.")
+        print("No results retrieved.")
 
 
 ################################################################################

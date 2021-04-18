@@ -10,17 +10,28 @@ import requests
 import dataclasses
 
 from datetime import datetime
-from typing import Optional, Iterator, Iterable, Any, Dict, Callable
+from typing import Optional, Iterator, Iterable, Any, Dict, Callable, Type
+
+
+################################################################################
+import tqdm
+
+
+def _field(
+        field_type: Type[Any],
+        header_name: Optional[str] = None) -> dataclasses.Field:
+    metadata = {'header_name': header_name} if header_name else None
+    return dataclasses.field(default_factory=field_type, metadata=metadata)
 
 
 ################################################################################
 @dataclasses.dataclass(frozen=True)
 class Contest:
-    id: int
-    long_name: str
-    short_name: str
-    start_time: datetime
-    end_time: datetime
+    id: int = _field(int, 'id')
+    long_name: str = _field(str, 'long name')
+    short_name: str = _field(str, 'short name')
+    start_time: datetime = _field(datetime)
+    end_time: datetime = _field(datetime)
     
     @staticmethod
     def build_from_json(content: Dict) -> 'Contest':
@@ -35,8 +46,8 @@ class Contest:
 ################################################################################
 @dataclasses.dataclass(frozen=True)
 class Team:
-    id: int
-    name: str
+    id: int = _field(int, 'id')
+    name: str = _field(str, 'name')
     
     @staticmethod
     def build_from_json(content: Dict) -> 'Team':
@@ -46,9 +57,9 @@ class Team:
 ################################################################################
 @dataclasses.dataclass(frozen=True)
 class Problem:
-    id: int
-    long_name: str
-    short_name: str
+    id: int = _field(int, 'id')
+    long_name: str = _field(str, 'long name')
+    short_name: str = _field(str, 'short name')
     
     @staticmethod
     def build_from_json(content: Dict) -> 'Problem':
@@ -58,13 +69,13 @@ class Problem:
 ################################################################################
 @dataclasses.dataclass(frozen=True)
 class Submission:
-    id: int
-    team_id: int
-    problem_id: int
-    language_id: str
-    time: datetime
-    max_run_time: float
-    judgement_type_id: str
+    id: int = _field(int, 'id')
+    team_id: int = _field(int, 'team id')
+    problem_id: int = _field(int)
+    language_id: str = _field(str, 'language')
+    time: datetime = _field(datetime)
+    max_run_time: float = _field(float, 'max. run time')
+    judgement_type_id: str = _field(str, 'judgement')
     
     @staticmethod
     def build_from_json(content: Dict) -> 'Submission':
@@ -92,6 +103,13 @@ class SourceCode:
             content['submission_id'],
             base64.b64decode(
                 content['source']).decode('utf-8').replace("\r\n", "\n"))
+
+
+################################################################################
+def _build_index(
+        instances: Iterable[Any],
+        key: Callable[[Any], Any] = lambda x: x.id) -> Dict:
+    return {key(inst):inst for inst in instances}
 
 
 ################################################################################
@@ -147,13 +165,18 @@ class DOMJudgeManager:
             self._yield_content_as_inst(url, SourceCode.build_from_json))
         
     def download_submission_files(
-            self, contest_id: int, output_dir_path: str) -> None:
+            self, contest_id: int, output_dir_path: str,
+            verbose: bool = False) -> None:
         teams = _build_index(self.get_teams(contest_id))
         problems = _build_index(self.get_problems(contest_id))
         
         output_dir = pathlib.Path(output_dir_path)
         
-        for submission in self.get_submissions(contest_id):
+        submissions = self.get_submissions(contest_id)
+        if verbose:
+            submissions = tqdm.tqdm(submissions, desc="downloading submissions")
+        
+        for submission in submissions:
             problem = problems[submission.problem_id]
             team = teams[submission.team_id]
             source_code = self.get_source_code(contest_id, submission.id)
@@ -165,7 +188,8 @@ class DOMJudgeManager:
                     f"{submission.judgement_type_id}.{submission.language_id}")
             
             output_file_path.parent.mkdir(parents=True, exist_ok=True)
-            output_file_path.write_text(source_code.source_code)
+            output_file_path.write_text(
+                source_code.source_code, encoding='utf-8')
     
     def _build_api_url(self, *args) -> str:
         return self.base_url + '/'.join(map(str, args))
@@ -177,10 +201,3 @@ class DOMJudgeManager:
     def _get_url_content(self, url) -> Dict:
         content = requests.get(url, auth=self.auth).content
         return json.loads(content.decode('utf-8'))
-    
-
-################################################################################
-def _build_index(
-        instances: Iterable[Any],
-        key: Callable[[Any], Any] = lambda x: x.id) -> Dict:
-    return {key(inst):inst for inst in instances}
