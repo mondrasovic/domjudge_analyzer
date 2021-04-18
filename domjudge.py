@@ -92,9 +92,9 @@ class Submission:
 ################################################################################
 @dataclasses.dataclass(frozen=True)
 class SourceCode:
-    id: int
-    submission_id: int
-    source_code: str
+    id: int = _field(int, 'id')
+    submission_id: int = _field(int, 'submission id')
+    source_code: str = _field(str)
     
     @staticmethod
     def build_from_json(content: Dict) -> 'SourceCode':
