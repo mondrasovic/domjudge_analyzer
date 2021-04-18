@@ -27,10 +27,13 @@ from domjudge import DOMJudgeManager
     help="Apply commands to the given contest specified by ID.")
 @click.option(
     "--get-teams", is_flag=True,
-    help="Print a list of all teams for the given contest specified by ID.")
+    help="Print a list of teams for the given contest specified by ID.")
 @click.option(
     "--get-problems", is_flag=True,
-    help="Print a list of all problems for the given contest specified by ID.")
+    help="Print a list of problems for the given contest specified by ID.")
+@click.option(
+    "--get-submissions", is_flag=True,
+    help="Print a list of submissions for the given contest specified by ID.")
 @click.option(
     "--submissions-dir-path", type=click.Path(),
     help="Directory path to download submission source files to.")
@@ -43,8 +46,9 @@ from domjudge import DOMJudgeManager
 def main(
         server: str, username: Optional[str], passwd: Optional[str],
         get_contests: bool, contest: Optional[int], get_teams: bool,
-        get_problems: bool, submissions_dir_path: click.Path,
-        csv_file_path: click.Path, verbose: bool) -> int:
+        get_problems: bool, get_submissions: bool,
+        submissions_dir_path: click.Path, csv_file_path: click.Path,
+        verbose: bool) -> int:
     if any(param is None for param in (server, username, passwd)):
         cfg = configparser.ConfigParser()
         cfg.read("config.cfg")
@@ -66,7 +70,9 @@ def main(
     if get_problems:
         assure_contest_is_set('--get-problems', contest)
         print_table(dj_man.get_problems(contest), csv_file_path)
-    
+    if get_submissions:
+        assure_contest_is_set('--get-submissions', contest)
+        print_table(dj_man.get_submissions(contest), csv_file_path)
     if submissions_dir_path:
         assure_contest_is_set('--submissions-dir-path', contest)
         dj_man.download_submission_files(

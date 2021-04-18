@@ -70,8 +70,8 @@ class Problem:
 @dataclasses.dataclass(frozen=True)
 class Submission:
     id: int = _field(int, 'id')
-    team_id: int = _field(int, 'team id')
-    problem_id: int = _field(int)
+    team_name: int = _field(int, 'team name')
+    problem_name: str = _field(str, 'problem name')
     language_id: str = _field(str, 'language')
     time: datetime = _field(datetime)
     max_run_time: float = _field(float, 'max. run time')
@@ -81,8 +81,8 @@ class Submission:
     def build_from_json(content: Dict) -> 'Submission':
         return Submission(
             content['id'],
-            content['team_id'],
-            content['problem_id'],
+            content['team_name'],
+            content['problem_name'],
             content['language_id'],
             datetime.fromisoformat(content['time']),
             content['max_run_time'],
@@ -141,6 +141,9 @@ class DOMJudgeManager:
         judgements_url = self._build_api_url(
             'contests', contest_id, 'judgements')
         
+        teams = _build_index(self.get_teams(contest_id))
+        problems = _build_index(self.get_problems(contest_id))
+        
         judgements = self._get_url_content(judgements_url)
         submission_to_judgement = _build_index(
             judgements, lambda x: x['submission_id'])
@@ -150,7 +153,13 @@ class DOMJudgeManager:
             submission_id = content['id']
             judgement = submission_to_judgement[submission_id]
             judgement_content = {k:judgement[k] for k in relevant_keys}
-            content_expanded = {**content, **judgement_content}
+            
+            team_name = teams[content['team_id']].name
+            problem_short_name = problems[content['problem_id']].short_name
+            
+            content_expanded = {
+                **content, **judgement_content,
+                **{'team_name': team_name, 'problem_name': problem_short_name}}
             
             return Submission.build_from_json(content_expanded)
         
