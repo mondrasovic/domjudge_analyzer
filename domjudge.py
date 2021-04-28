@@ -10,7 +10,7 @@ import requests
 import dataclasses
 
 from datetime import datetime
-from typing import Optional, Iterator, Iterable, Any, Dict, Callable, Type
+from typing import Optional, Iterator, Iterable, Any, Dict, Callable, Type, Set
 
 
 ################################################################################
@@ -70,7 +70,9 @@ class Problem:
 @dataclasses.dataclass(frozen=True)
 class Submission:
     id: int = _field(int, 'id')
+    team_id: int = _field(int)
     team_name: int = _field(int, 'team name')
+    problem_id: int = _field(int)
     problem_name: str = _field(str, 'problem name')
     language_id: str = _field(str, 'language')
     time: datetime = _field(datetime)
@@ -81,7 +83,9 @@ class Submission:
     def build_from_json(content: Dict) -> 'Submission':
         return Submission(
             content['id'],
+            content['team_id'],
             content['team_name'],
+            content['problem_id'],
             content['problem_name'],
             content['language_id'],
             datetime.fromisoformat(content['time']),
@@ -116,9 +120,13 @@ def _build_index(
 class DOMJudgeManager:
     def __init__(
             self, base_url: str, username: Optional[str] = None,
-            password: Optional[str] = None) -> None:
+            password: Optional[str] = None,
+            teams_subset: Optional[Iterable[str]] = None) -> None:
         self.base_url: str = base_url
         self.auth: Optional[requests.auth.HTTPBasicAuth] = None
+        
+        if teams_subset:
+            self.teams_subset: Optional[Set[str]] = set(teams_subset)
         
         if None not in (username, password):
             self.auth = requests.auth.HTTPBasicAuth(username, password)
